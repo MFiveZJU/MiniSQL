@@ -9,40 +9,39 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-class catalogManager
+class CatalogManager
 {
 private:
 	string dbName;
-	vector<table_info> tables;	//全部表
+	vector<TableInfo> tables;	//全部表
 	int tableNum;			//数据库内表的数量,等于tables.size()
-	vector<index_info> indexes;
+	vector<Index> indexes;
 	int indexNum;
 public:
-	catalogManager()
+	CatalogManager()
 	{
 		cout << "Specify Database Name: ";
 		string temp;
 		cin >> temp;
-		Use_Database(temp);
+		useDatabase(temp);
 	};
-	catalogManager(string name):dbName(name)
+	CatalogManager(string name):dbName(name)
 	{
-		cout << "catalogManager(string name);" << endl;//test
 		initialCatalog();
 	};
-	~catalogManager()
+	~CatalogManager()
 	{
 		storeCatalog();
 	};
 	//在开始执行功能前将文件内信息读入内存,结束时写回硬盘
 	bool initialCatalog();
 	bool storeCatalog();
-	bool Create_Database(string DB_Name);
-	bool Create_Table(table_info newTable, string DB_Name);
-	bool Create_Index(index_info index, string DB_Name);
-	bool Drop_Database(string DB_Name);
-	bool Drop_Table(string Table_Name,string DB_Name);
-	bool Drop_Index(string Index_Name,string DB_Name);
+	bool createDatabase(string DB_Name);
+	bool createTable(TableInfo newTable, string DB_Name);
+	bool createIndex(Index index, string DB_Name);
+	bool dropDatabase(string DB_Name);
+	bool dropTable(string Table_Name,string DB_Name);
+	bool dropIndex(string Index_Name,string DB_Name);
 	bool existDB(string DB_Name)
 	{
 		const string filename = DB_Name + "_table.catalog";
@@ -56,7 +55,7 @@ public:
 	bool existTable(string Table_Name, string DB_Name)
 	{
 		if(DB_Name != dbName)
-			Use_Database(DB_Name);
+			useDatabase(DB_Name);
 		for(int i = 0; i < tableNum; i++)
 			if(tables[i].name == Table_Name)
 				return true;
@@ -66,7 +65,7 @@ public:
 	bool existAttr(string Attr_Name, string Table_Name, string DB_Name)
 	{
 		if(DB_Name != dbName)
-			Use_Database(DB_Name);
+			useDatabase(DB_Name);
 		for(int i = 0; i < tableNum; i++)
 			if(tables[i].name == Table_Name)
 				for (int j = 0; j < tables[i].attrNum; j++)
@@ -76,7 +75,7 @@ public:
 	bool existIndex(string Index_Name, string DB_Name)
 	{
 		if(DB_Name != dbName)
-			Use_Database(DB_Name);
+			useDatabase(DB_Name);
 		for(int i = 0; i < indexNum; i++)
 			if(indexes[i].name == Index_Name)
 				return true;
@@ -86,7 +85,7 @@ public:
 	bool existIndex(string Table_Name, string Attr_Name, string DB_Name)
 	{
 		if(DB_Name != dbName)
-			Use_Database(DB_Name);
+			useDatabase(DB_Name);
 		for(int i = 0; i < tableNum; i++)
 			if(tables[i].name == Table_Name)
 				for(int j = 0; j < tables[i].attrNum; j++)
@@ -95,10 +94,12 @@ public:
 
 		return false;
 	}
-	table_info Get_Table_Info(string DB_Name, string Table_Name);
-	index_info Get_Index_Info(string DB_Name, string Index_Name);
-	index_info Get_Index_Info(string DB_Name, string Table_Name, string Attr_Name);
-	void Use_Database(string DB_Name)
+	TableInfo getTableInfo(string DB_Name, string Table_Name);
+	Index getIndexInfo(string DB_Name, string Index_Name);
+	Index getIndexInfo(string DB_Name, string Table_Name, string Attr_Name);
+	////To be continued
+	bool getAllIndex(string DB_Name, string Table_Name, vectror<Index>& allIndex);
+	void useDatabase(string DB_Name)
 	{
 		if(dbName.empty())
 			storeCatalog();
@@ -107,7 +108,7 @@ public:
 	};
 };
 
-bool catalogManager::initialCatalog()
+bool CatalogManager::initialCatalog()
 {
 	string filename = dbName + "_table.catalog";
 	fstream  fin(filename.c_str(), ios::in);
@@ -116,13 +117,13 @@ bool catalogManager::initialCatalog()
 	fin >> tableNum;
 	for(int i = 0; i < tableNum; i++)
 	{//fill in the vector of tables
-		table_info temp_table;
+		TableInfo temp_table;
 		fin >> temp_table.name;
 		fin >> temp_table.attrNum;
-		fin >> temp_table.blockNo;
+		//fin >> temp_table.blockNum;
 		for(int j = 0; j < temp_table.attrNum; j++)
 		{//fill in the vector of temp_table.attributes
-			attr_info temp_attr;
+			AttrInfo temp_attr;
 	 		fin >> temp_attr.name;
 	 		fin >> temp_attr.type;
 	 		fin >> temp_attr.length;
@@ -141,11 +142,11 @@ bool catalogManager::initialCatalog()
 	fin >> indexNum;
 	for(int i = 0; i < indexNum; i++)
 	{//fill in the vector of tables
-		index_info temp_index;
+		Index temp_index;
 		fin >> temp_index.name;
 		fin >> temp_index.tableName;
 		fin >> temp_index.attrName;
-		fin >> temp_index.blockNo;
+		//fin >> temp_index.blockNum;
 	 	indexes.push_back(temp_index);
 	}
 	fin.close();
@@ -153,7 +154,7 @@ bool catalogManager::initialCatalog()
 	return true;
 }
 
-bool catalogManager::storeCatalog()
+bool CatalogManager::storeCatalog()
 {
 	string filename = dbName + "_table.catalog";
 	fstream  fout(filename.c_str(), ios::out);
@@ -162,7 +163,7 @@ bool catalogManager::storeCatalog()
 	{
 		fout << tables[i].name << " ";
 		fout << tables[i].attrNum <<" ";
-		fout << tables[i].blockNo << " ";
+		//fout << tables[i].blockNum << " ";
 		fout << tables[i].totalLength << endl;
 		for(int j = 0; j < tables[i].attrNum; j++)
 		{
@@ -181,15 +182,16 @@ bool catalogManager::storeCatalog()
 	{
 		fout << indexes[i].name << " ";
 		fout << indexes[i].tableName <<" ";
-		fout << indexes[i].attrName << " ";
-		fout << indexes[i].blockNo << endl;
+		//fout << indexes[i].attrName << " ";
+		//fout << indexes[i].blockNum << endl;
+		fout << indexes[i].attrName << endl;
 	}
 	fout.close();
 
 	return true;
 }
 
-bool catalogManager::Create_Database(string DB_Name)
+bool CatalogManager::createDatabase(string DB_Name)
 {
 	if(existDB(DB_Name))
 		return false;
@@ -204,11 +206,11 @@ bool catalogManager::Create_Database(string DB_Name)
 
 	return true;
 }
-
-bool catalogManager::Create_Table(table_info newTable, string DB_Name)
+//emptyAmount/emptyBlock[100]:-1。
+bool CatalogManager::createTable(TableInfo newTable, string DB_Name)
 {
 	if(DB_Name != dbName)
-		Use_Database(DB_Name);
+		useDatabase(DB_Name);
 	const string filename = DB_Name + "_" + newTable.name + ".db";
 	fstream file;
 	file.open(filename.c_str(), ios::in);
@@ -221,6 +223,11 @@ bool catalogManager::Create_Table(table_info newTable, string DB_Name)
 	file << 0;          //blockAmount
 	file << tableNum;   //recordLength
 	file << 0;          //recordAmount
+	file << 0;			//emptyAmount
+	int emptyBlock[100];
+	memset(emptyBlock, -1, sizeof(emptyBlock));
+	for (int i = 0; i < 100; ++i)
+		file << emptyBlock[i];
 	file.close();
 	tableNum++;
  	tables.push_back(newTable);
@@ -228,10 +235,10 @@ bool catalogManager::Create_Table(table_info newTable, string DB_Name)
  	return true;
 }
 
-bool catalogManager::Create_Index(index_info index, string DB_Name)
+bool CatalogManager::createIndex(Index index, string DB_Name)
 {
 	if(DB_Name != dbName)
-		Use_Database(DB_Name);
+		useDatabase(DB_Name);
 	const string filename = DB_Name + "_" + index.tableName + "_" + index.attrName + "_" + index.name + ".index";
 	fstream file;
 	file.open(filename.c_str(), ios::in);
@@ -253,7 +260,7 @@ bool catalogManager::Create_Index(index_info index, string DB_Name)
 	return true;
 }
 
-bool catalogManager::Drop_Database(string DB_Name)
+bool CatalogManager::dropDatabase(string DB_Name)
 {
 	string filename = DB_Name + "_table.catalog";
 	if(!remove(filename.c_str()))
@@ -275,10 +282,10 @@ bool catalogManager::Drop_Database(string DB_Name)
 	}
 }
 
-bool catalogManager::Drop_Table(string Table_Name, string DB_Name)
+bool CatalogManager::dropTable(string Table_Name, string DB_Name)
 {
 	if(DB_Name != dbName)
-		Use_Database(DB_Name);
+		useDatabase(DB_Name);
 	const string filename = DB_Name + "_" + Table_Name + ".db";
 	if(!remove(filename.c_str()))
 		return false;
@@ -295,10 +302,10 @@ bool catalogManager::Drop_Table(string Table_Name, string DB_Name)
 	return false;
 }
 
-bool catalogManager::Drop_Index(string Index_Name,string DB_Name)
+bool CatalogManager::dropIndex(string Index_Name,string DB_Name)
 {
 	if(DB_Name != dbName)
-		Use_Database(DB_Name);
+		useDatabase(DB_Name);
 	for(int i = indexNum -1; i >= 0; i--)
 	{
 		if(indexes[i].name == Index_Name)
@@ -320,10 +327,10 @@ bool catalogManager::Drop_Index(string Index_Name,string DB_Name)
 	return false;
 }
 
-table_info catalogManager::Get_Table_Info(string DB_Name, string Table_Name)
+TableInfo CatalogManager::getTableInfo(string DB_Name, string Table_Name)
 {
 	if(DB_Name != dbName)
-		Use_Database(DB_Name);
+		useDatabase(DB_Name);
 	for(int i = 0; i < tableNum; i++)
 	{
 		if(tables[i].name == Table_Name)
@@ -331,10 +338,10 @@ table_info catalogManager::Get_Table_Info(string DB_Name, string Table_Name)
 	}
 }
 
-index_info catalogManager::Get_Index_Info(string DB_Name, string Index_Name)
+Index CatalogManager::getIndexInfo(string DB_Name, string Index_Name)
 {
 	if(DB_Name != dbName)
-		Use_Database(DB_Name);
+		useDatabase(DB_Name);
 	for(int i = 0; i < indexNum; i++)
 	{
 		if(indexes[i].name == Index_Name)
@@ -342,10 +349,10 @@ index_info catalogManager::Get_Index_Info(string DB_Name, string Index_Name)
 	}
 }
 
-index_info catalogManager::Get_Index_Info(string DB_Name, string Table_Name, string Attr_Name)
+Index CatalogManager::getIndexInfo(string DB_Name, string Table_Name, string Attr_Name)
 {
 	if(DB_Name != dbName)
-		Use_Database(DB_Name);
+		useDatabase(DB_Name);
 	for(int i = 0; i < indexNum; i++)
 	{
 		if(indexes[i].tableName == Table_Name && indexes[i].attrName == Attr_Name)
