@@ -5,7 +5,7 @@
 //  Created by Leon on 14/11/8.
 //  Copyright (c) 2014年 ZJU. All rights reserved.
 //
-
+//  怎么识别'和"？insert语句有问题
 #include "Interpreter.h"
 
 
@@ -30,7 +30,9 @@ string Interpreter::read_input(){
         result +=temp;
         result +=" ";
     }
+    cout << "命令行输入: " << result << endl;
     return result;
+    
 }
 //从文件读取用户的SQL语句
 string Interpreter::read_input(ifstream& fin){
@@ -44,10 +46,10 @@ string Interpreter::read_input(ifstream& fin){
         result +=temp;
         result +=" ";
     }
-//    cout << "输入为：" << result <<endl;
+    cout << "文件输入：" << result <<endl;
     return result;
 }
-//把 （ ） ， ；等都用空格分开
+//把 （ ） ， ；* " ' 等都用空格分开
 string Interpreter::process(string& SQL){
     int i;
     string result;
@@ -60,10 +62,36 @@ string Interpreter::process(string& SQL){
             result +=" ) ";
         else if(SQL[i]==';')
             result +=" ; ";
+        else if(SQL[i]=='*')
+            result +=" * ";
+        else if(SQL[i]=='=')
+            result +=" = ";
+        else if(SQL[i]=='>'){
+            if (SQL[i+1]=='=') {
+                result += " >= ";
+                i++;
+            }
+            else{
+                result += " > ";
+            }
+        }
+        else if(SQL[i]=='<'){
+            if (SQL[i+1]=='=') {
+                result += " <= ";
+                i++;
+            }
+            else if(SQL[i+1]=='>'){
+                result += " <> ";
+                i++;
+            }
+            else{
+                result += " < ";
+            }
+        }
         else
             result +=SQL[i];
     }
-//    cout << "加完空格：" << result << endl;
+    cout << "加完空格：" << result << endl;
     return result;
 }
 //获取用空格分开的word
@@ -114,7 +142,7 @@ int Interpreter::run(string SQL,string& execfilename){
             table.name = temp;
             temp = getword(SQL);
             if(temp.compare("(")!=0){
-                cout<<"Expected '('"<<endl;
+                cout<<"Expected '(' after 'table'"<<endl;
                 return 1; //语法错误
             }
             temp = getword(SQL);
@@ -127,7 +155,7 @@ int Interpreter::run(string SQL,string& execfilename){
                     }
                     temp = getword(SQL);
                     if(temp.compare("(")!=0){
-                        cout<<"Expected '('"<<endl;
+                        cout<<"Expected '(' after 'primary key'"<<endl;
                         return 1;
                     }
                     temp = getword(SQL);
@@ -275,11 +303,13 @@ int Interpreter::run(string SQL,string& execfilename){
         string tablename;
         temp = getword(SQL);
         if (temp.compare("*") == 0) {
+            colomns.push_back(temp);
             temp = getword(SQL);
         }
         else{
             colomns.push_back(temp);
             temp = getword(SQL);
+            
             while (temp.compare(",") == 0) {
                 temp = getword(SQL);
                 colomns.push_back(temp);
@@ -343,11 +373,11 @@ int Interpreter::run(string SQL,string& execfilename){
             
         }
         cout << "select ";
-        for (int i=0; i <= colomns.size(); i++) {
+        for (int i=0; i < colomns.size(); i++) {
             cout << colomns[i] << " ";
         }
         cout << "from " << tablename << " where" << endl;
-        for (int i=0; i <= conds.size(); i++) {
+        for (int i=0; i < conds.size(); i++) {
             cout << conds[i].columname << " " << conds[i].op << " " << conds[i].value << endl;
         }
         //cout <<"==" <<  conds[0].op << " " << conds.size() << endl;
@@ -374,9 +404,16 @@ int Interpreter::run(string SQL,string& execfilename){
             return 1;
         }
         temp = getword(SQL);
+//        cout << temp <<endl;
         while(temp.compare(";")!=0){
+//            if ((temp.compare("\'") == 0) || (temp.compare("\"") == 0)) {
+//                temp = getword(SQL);
+//            }
             values.push_back(temp);
             temp = getword(SQL);
+//            if ((temp.compare("\'") == 0) || (temp.compare("\"") == 0)) {
+//                temp = getword(SQL);
+//            }
             temp = getword(SQL);
         }
         cout << "insert into values(";
@@ -389,7 +426,6 @@ int Interpreter::run(string SQL,string& execfilename){
     }
     else if(opcode.compare("delete")==0){
         temp = getword(SQL);
-        vector<Condition> conds;
         Condition cond;
         string tablename;
         if(temp.compare("from")!=0){
@@ -400,98 +436,49 @@ int Interpreter::run(string SQL,string& execfilename){
         temp = getword(SQL);
         if(temp.compare("where")==0){
             s1 = getword(SQL);
-            while(s1.compare(";")!=0){   //处理多个条件
-                cond.columname = s1;
-                s2 = getword(SQL);  //条件
-                if(s2.compare("=")==0){
-                    cond.op = EQ;
-                }
-                else if(s2.compare("<>")==0){
-                    cond.op = NE;
-                }
-                else if(s2.compare("<")==0){
-                    cond.op = LT;
-                }
-                else if(s2.compare(">")==0){
-                    cond.op = GT;
-                }
-                else if(s2.compare("<=")==0){
-                    cond.op = LE;
-                }
-                else if(s2.compare(">=")==0){
-                    cond.op = GE;
-                }
-                else{
-                    cout<<"Not support this kind of op"<<endl;
-                    return 1;
-                }
-                s3 = getword(SQL);
-                cond.value = s3;
-                conds.push_back(cond);
-                s1 = getword(SQL);
-                if(s1.compare(";")==0){
-                    break;
-                }
-                else if(s1.compare("and") != 0){
-                    cout << "Expected 'and'" << endl;
-                    return 1;
-                }
-                s1 = getword(SQL);
+            s2 = getword(SQL);
+            s3 = getword(SQL);
+            cond.columname = s1;
+            cond.value = s3;
+            if(s2.compare("=")==0){
+                cond.op = EQ;
             }
-//            s1 = getword(SQL);
-//            s2 = getword(SQL);
-//            s3 = getword(SQL);
-//            cond.columname = s1;
-//            cond.value = s3;
-//            if(s2.compare("=")==0){
-//                cond.op = EQ;
-//            }
-//            else if(s2.compare("<>")==0){
-//                cond.op = NE;
-//            }
-//            else if(s2.compare("<")==0){
-//                cond.op = LT;
-//            }
-//            else if(s2.compare(">")==0){
-//                cond.op = GT;
-//            }
-//            else if(s2.compare("<=")==0){
-//                cond.op = LE;
-//            }
-//            else if(s2.compare(">=")==0){
-//                cond.op = GE;
-//            }
-//            else{
-//                cout<<"Not support this kind of op!"<<endl;
-//                return 1;
-//            }
+            else if(s2.compare("<>")==0){
+                cond.op = NE;
+            }
+            else if(s2.compare("<")==0){
+                cond.op = LT;
+            }
+            else if(s2.compare(">")==0){
+                cond.op = GT;
+            }
+            else if(s2.compare("<=")==0){
+                cond.op = LE;
+            }
+            else if(s2.compare(">=")==0){
+                cond.op = GE;
+            }
+            else{
+                cout<<"Not support this kind of op!"<<endl;
+                return 1;
+            }
+            s1 = getword(SQL);
         }
-        cout << "delete from " << tablename << " where" << endl;
-        for (int i = 0; i <= conds.size(); i++) {
-            cout << conds[i].columname << " " << conds[i].op << " " << conds[i].value << endl;
+        else{
+            cout << "Expected 'where' after table name" << endl;
+            return 1;
         }
+    
+        cout << "delete from " << tablename << " where " << cond.columname << cond.op << cond.value << endl;
 //        myAPI.deletetable(tablename,conds);
         return 0;
     }
-    
+
     else if(opcode.compare("quit")==0){
 //        myAPI.quit();
         cout << "quit!" << endl;
         exit(1);
     }
-//    else if(opcode.compare("show")==0){
-//        temp = getword(SQL);
-//        if(temp.compare("table")==0){
-//            myAPI.showtable();
-//        }
-//        else if(temp.compare("index")==0){
-//            myAPI.showindex();
-//        }
-//        else{
-//            cout<<"Not support this kind of SQL sentence!"<<endl;
-//        }
-//        return 0;
-//    }
     else if(opcode.compare("execfile")==0){
         temp = getword(SQL);
         execfilename = temp;
